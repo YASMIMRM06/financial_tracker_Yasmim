@@ -1,6 +1,7 @@
 _*Informativo de Atividades*_
 
 _Atividade 1_
+
 *O que deve ser feito:*
 * Adicionar novas funcionalidades ao projeto;
 * Realizar uma estilização mais elaborada (não apenas alteração de cores);
