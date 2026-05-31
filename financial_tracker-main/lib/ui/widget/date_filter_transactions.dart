@@ -2,24 +2,21 @@ import 'package:financial_tracker/common/types/date_filter_type.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
-//enum DateFilterType { all, today, week, month, custom }
+const _emerald  = Color(0xFF00897B);
+const _emeraldL = Color(0xFF4DB6AC);
+const _slate50  = Color(0xFFF8FAFC);
+const _slate100 = Color(0xFFF1F5F9);
+const _slate400 = Color(0xFF94A3B8);
+const _slate700 = Color(0xFF334155);
+const _slate800 = Color(0xFF1E293B);
+const _cardDark = Color(0xFF243044);
 
-/// Widget for filtering transactions by date
 class DateFilterTransactions extends StatefulWidget {
-  /// Callback for when date filter changes
   final Function(DateTime? startDate, DateTime? endDate) onFilterChanged;
-
-  /// Função de callback quando o formulário é enviado
   final Function() onAllTransactionsFiltered;
-
-  // call para atualizar o filtro de data
-  final Function(DateFilterType type, DateTime? startDate, DateTime? endDate)
-  onUpdateFilter;
-
-  /// Callback for when the filter is hidden
+  final Function(DateFilterType type, DateTime? startDate, DateTime? endDate) onUpdateFilter;
   final VoidCallback? onTapHideFilter;
-
-final ({DateFilterType type, DateTime? startDate, DateTime? endDate}) filtro;
+  final ({DateFilterType type, DateTime? startDate, DateTime? endDate}) filtro;
 
   const DateFilterTransactions({
     super.key,
@@ -34,38 +31,36 @@ final ({DateFilterType type, DateTime? startDate, DateTime? endDate}) filtro;
   State<DateFilterTransactions> createState() => _DateFilterWidgetState();
 }
 
-class _DateFilterWidgetState extends State<DateFilterTransactions> {
+class _DateFilterWidgetState extends State<DateFilterTransactions> with SingleTickerProviderStateMixin {
   late DateFilterType _filterType;
   DateTime? _startDate;
   DateTime? _endDate;
+  late AnimationController _animController;
+  late Animation<double> _fadeIn;
 
   @override
   void initState() {
     super.initState();
     _filterType = widget.filtro.type;
-    _startDate = widget.filtro.startDate;
-    _endDate = widget.filtro.endDate;
-
-    // Initialize dates based on current filter
+    _startDate  = widget.filtro.startDate;
+    _endDate    = widget.filtro.endDate;
     _initializeDates();
+    _animController = AnimationController(vsync: this, duration: const Duration(milliseconds: 300));
+    _fadeIn = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
+    _animController.forward();
   }
 
-  void _initializeDates() {
-    final now = DateTime.now();
-    final range = _filterType.resolveRange(now, _startDate, _endDate);
+  @override
+  void dispose() { _animController.dispose(); super.dispose(); }
 
-    setState(() {
-      _startDate = range?.start;
-      _endDate = range?.end;
-    });
+  void _initializeDates() {
+    final now   = DateTime.now();
+    final range = _filterType.resolveRange(now, _startDate, _endDate);
+    setState(() { _startDate = range?.start; _endDate = range?.end; });
   }
 
   void _applyFilter(DateFilterType type) {
-    setState(() {
-      _filterType = type;
-      _initializeDates();
-    });
-
+    setState(() { _filterType = type; _initializeDates(); });
     if (type == DateFilterType.all) {
       widget.onAllTransactionsFiltered();
     } else {
@@ -75,56 +70,43 @@ class _DateFilterWidgetState extends State<DateFilterTransactions> {
   }
 
   Future<void> _selectCustomDateRange() async {
-    // final now = DateTime.now();
-    // final initialDateRange = DateTimeRange(
-    //   start: _startDate ?? DateTime(now.year, now.month, 1),
-    //   end: _endDate ?? now,
-    // );
-    // print(_startDate);
-    // print(_endDate);
-    // print(initialDateRange);
-    final now = DateTime.now();
-    final maxDate = now.add(const Duration(days: 1));
+    final now      = DateTime.now();
+    final maxDate  = now.add(const Duration(days: 1));
+    final safeRange = _filterType.resolveRange(now, _startDate, _endDate)?.cappedAt(maxDate);
 
-    final safeRange = _filterType
-        .resolveRange(now, _startDate, _endDate)
-        ?.cappedAt(
-          maxDate,
-        ); // com operador "?", cappedAt só é executado se o valor não for nulo retornado por resolveRange
-
-    final pickedDateRange = await showDateRangePicker(
+    final picked = await showDateRangePicker(
       context: context,
       initialDateRange: safeRange,
       firstDate: DateTime(2020),
       lastDate: DateTime.now().add(const Duration(days: 1)),
+      locale: const Locale('pt', 'BR'),
       builder: (context, child) {
+        // Tema limpo para o calendário — fundo branco, cores definidas
         return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: Theme.of(context).colorScheme.primary,
-              onPrimary: Colors.white,
+          data: ThemeData.light().copyWith(
+            colorScheme: const ColorScheme.light(
+              primary:          _emerald,
+              onPrimary:        Colors.white,
+              surface:          Colors.white,
+              onSurface:        Color(0xFF0F172A),
+              secondaryContainer: Color(0xFFB2DFDB),
             ),
+            textButtonTheme: TextButtonThemeData(
+              style: TextButton.styleFrom(foregroundColor: _emerald),
+            ),
+            dialogTheme: const DialogThemeData(backgroundColor: Colors.white),
           ),
           child: child!,
         );
       },
     );
 
-    if (pickedDateRange != null) {
+    if (picked != null) {
       setState(() {
         _filterType = DateFilterType.custom;
-        _startDate = pickedDateRange.start;
-        // Set end date to end of day
-        _endDate = DateTime(
-          pickedDateRange.end.year,
-          pickedDateRange.end.month,
-          pickedDateRange.end.day,
-          23,
-          59,
-          59,
-        );
+        _startDate  = picked.start;
+        _endDate    = DateTime(picked.end.year, picked.end.month, picked.end.day, 23, 59, 59);
       });
-
       widget.onFilterChanged(_startDate, _endDate);
       widget.onUpdateFilter(_filterType, _startDate, _endDate);
     }
@@ -132,141 +114,112 @@ class _DateFilterWidgetState extends State<DateFilterTransactions> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Card(
-      margin: const EdgeInsets.all(16),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return FadeTransition(
+      opacity: _fadeIn,
       child: Container(
-        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          gradient: LinearGradient(
-            colors: [
-              theme.colorScheme.primary.withValues(alpha: 0.7),
-              theme.colorScheme.secondary,
-            ],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: isDark ? _cardDark : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: isDark ? _slate800 : _emerald.withValues(alpha: 0.2)),
+          boxShadow: isDark ? [] : [BoxShadow(color: _emerald.withValues(alpha: 0.08), blurRadius: 12, offset: const Offset(0, 4))],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Filter title
-            Row(
-              children: [
+
+            // Header
+            Container(
+              padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+              decoration: BoxDecoration(
+                color: _emerald.withValues(alpha: 0.06),
+                borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), topRight: Radius.circular(20)),
+              ),
+              child: Row(children: [
+                Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: _emerald.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(8)),
+                  child: const Icon(Icons.filter_alt_outlined, color: _emerald, size: 16)),
+                const SizedBox(width: 10),
+                const Text('Filtrar por período', style: TextStyle(color: _emerald, fontSize: 13, fontWeight: FontWeight.w600)),
+                const Spacer(),
                 IconButton(
-                  icon: Icon(
-                    Icons.filter_list,
-                    color: theme.colorScheme.onSecondary,
-                  ),
-                  onPressed: () {
-                    // Aqui você aciona a função que alterna visibilidade
-                    // Essa função vem da tela principal, então passe como parâmetro
-                    widget.onTapHideFilter
-                        ?.call(); // ou diretamente: _toggleFilterVisibility()
-                  },
+                  icon: Icon(Icons.close_rounded, size: 18, color: isDark ? _slate400 : _slate700),
+                  onPressed: widget.onTapHideFilter,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  'Filtro de Data de Transações',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onSecondary,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Wrap envolve os widgets filhos em uma linha com quebra automática
-            Wrap(
-              spacing: 8,
-              children: [
-                _buildFilterChip(DateFilterType.all, 'Tudo'),
-                _buildFilterChip(DateFilterType.today, 'Hoje'),
-                _buildFilterChip(DateFilterType.week, 'Esta Semana'),
-                _buildFilterChip(DateFilterType.month, 'Este Mês'),
-                _buildFilterChip(DateFilterType.custom, 'Personalizado'),
-              ],
+              ]),
             ),
 
-            // Show date range if custom filter selected
-            if (_filterType == DateFilterType.custom) ...[
-              const SizedBox(height: 12),
-              InkWell(
-                onTap: _selectCustomDateRange,
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 8,
-                  ),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: theme.colorScheme.outline),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.date_range,
-                        size: 18,
-                        color: theme.colorScheme.primary,
-                      ),
+            // Chips
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _chip(DateFilterType.all,    'Tudo',         Icons.all_inclusive_rounded,  isDark),
+                  _chip(DateFilterType.today,  'Hoje',         Icons.today_rounded,           isDark),
+                  _chip(DateFilterType.week,   'Esta semana',  Icons.view_week_rounded,       isDark),
+                  _chip(DateFilterType.month,  'Este mês',     Icons.calendar_month_rounded,  isDark),
+                  _chip(DateFilterType.custom, 'Personalizado',Icons.date_range_rounded,      isDark),
+                ],
+              ),
+            ),
+
+            // Range personalizado selecionado
+            if (_filterType == DateFilterType.custom && _startDate != null && _endDate != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                child: GestureDetector(
+                  onTap: _selectCustomDateRange,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _emerald.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: _emerald.withValues(alpha: 0.3)),
+                    ),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.date_range_rounded, size: 15, color: _emerald),
                       const SizedBox(width: 8),
                       Text(
-                        '${DateFormat('dd/MM/yyyy').format(_startDate!)} - ${DateFormat('dd/MM/yyyy').format(_endDate!)}',
-                        style: theme.textTheme.bodyMedium,
+                        '${DateFormat('dd/MM/yyyy').format(_startDate!)} → ${DateFormat('dd/MM/yyyy').format(_endDate!)}',
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _emerald),
                       ),
-                      const SizedBox(width: 4),
-                      Icon(
-                        Icons.edit,
-                        size: 16,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ],
+                      const SizedBox(width: 6),
+                      const Icon(Icons.edit_outlined, size: 13, color: _emerald),
+                    ]),
                   ),
                 ),
               ),
-            ],
           ],
         ),
       ),
     );
   }
 
-  /// Build a filter chip for date selection
-  Widget _buildFilterChip(DateFilterType type, String label) {
-    final theme = Theme.of(context);
+  Widget _chip(DateFilterType type, String label, IconData icon, bool isDark) {
     final isSelected = _filterType == type;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 700),
-      child: ChoiceChip(
-        checkmarkColor: theme.colorScheme.onSecondary,
-        label: Text(label),
-        selected: isSelected,
-        selectedColor: theme.colorScheme.primary.withValues(alpha: 0.9),
-        labelStyle: TextStyle(
-          color:
-              isSelected
-                  ? theme.colorScheme.onSecondary
-                  : theme.textTheme.bodyLarge?.color,
-          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+    return GestureDetector(
+      onTap: () => type == DateFilterType.custom ? _selectCustomDateRange() : _applyFilter(type),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          gradient: isSelected ? const LinearGradient(colors: [_emerald, _emeraldL]) : null,
+          color: isSelected ? null : (isDark ? _slate800 : _slate100.withValues(alpha: 0.8)),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: isSelected ? _emerald : _slate400.withValues(alpha: 0.3)),
+          boxShadow: isSelected ? [BoxShadow(color: _emerald.withValues(alpha: 0.25), blurRadius: 8, offset: const Offset(0, 2))] : [],
         ),
-        onSelected: (selected) {
-          if (selected) {
-            if (type == DateFilterType.custom) {
-              _selectCustomDateRange();
-            } else {
-              _applyFilter(type);
-            }
-          }
-        },
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 13, color: isSelected ? Colors.white : _slate400),
+          const SizedBox(width: 6),
+          Text(label, style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500, color: isSelected ? Colors.white : (isDark ? _slate400 : _slate700))),
+        ]),
       ),
     );
   }
