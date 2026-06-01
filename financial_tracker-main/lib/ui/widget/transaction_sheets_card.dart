@@ -4,7 +4,6 @@ import 'package:financial_tracker/common/utils/formatter.dart';
 import 'package:financial_tracker/domain/entity/transaction_entity.dart';
 import 'package:flutter/material.dart';
 
-// Cores inline
 const _emerald     = Color(0xFF00897B);
 const _emeraldL    = Color(0xFF4DB6AC);
 const _violet      = Color(0xFF7C4DFF);
@@ -42,8 +41,11 @@ class TransactionCardSheets extends StatefulWidget {
   State<TransactionCardSheets> createState() => _TransactionCardSheetsState();
 }
 
-class _TransactionCardSheetsState extends State<TransactionCardSheets> with SingleTickerProviderStateMixin {
+class _TransactionCardSheetsState extends State<TransactionCardSheets>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final ScrollController _incomeScroll  = ScrollController();
+  final ScrollController _expenseScroll = ScrollController();
 
   @override
   void initState() {
@@ -53,7 +55,12 @@ class _TransactionCardSheetsState extends State<TransactionCardSheets> with Sing
   }
 
   @override
-  void dispose() { _tabController.dispose(); super.dispose(); }
+  void dispose() {
+    _tabController.dispose();
+    _incomeScroll.dispose();
+    _expenseScroll.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,15 +71,14 @@ class _TransactionCardSheetsState extends State<TransactionCardSheets> with Sing
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Cabeçalho
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: Row(
-              children: [
-                Container(width: 3, height: 16, decoration: BoxDecoration(gradient: _expenseGrad, borderRadius: BorderRadius.circular(2))),
-                const SizedBox(width: 8),
-                Text('Transações', style: Theme.of(context).textTheme.titleSmall?.copyWith(color: isDark ? _slate400 : _slate700, letterSpacing: 0.5)),
-              ],
-            ),
+            child: Row(children: [
+              Container(width: 3, height: 16, decoration: BoxDecoration(gradient: _expenseGrad, borderRadius: BorderRadius.circular(2))),
+              const SizedBox(width: 8),
+              Text('Transações', style: Theme.of(context).textTheme.titleSmall?.copyWith(color: isDark ? _slate400 : _slate700, letterSpacing: 0.5)),
+            ]),
           ),
 
           Container(
@@ -82,24 +88,22 @@ class _TransactionCardSheetsState extends State<TransactionCardSheets> with Sing
               border: Border.all(color: isDark ? _slate700.withValues(alpha: 0.5) : _slate100),
               boxShadow: isDark ? [] : [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 20, offset: const Offset(0, 4))],
             ),
-            child: Column(
-              children: [
-                _buildTabBar(context, isDark),
-                ClipRRect(
-                  borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(24), bottomRight: Radius.circular(24)),
-                  child: SizedBox(
-                    height: 310,
-                    child: TabBarView(
-                      controller: _tabController,
-                      children: [
-                        _buildList(context, widget.incomeTransactions, _emerald, TransactionType.income),
-                        _buildList(context, widget.expenseTransactions, _violet,  TransactionType.expense),
-                      ],
-                    ),
+            child: Column(children: [
+              _buildTabBar(context, isDark),
+              ClipRRect(
+                borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(24), bottomRight: Radius.circular(24)),
+                child: SizedBox(
+                  height: 340,
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildList(context, widget.incomeTransactions,  _emerald, TransactionType.income,  _incomeScroll),
+                      _buildList(context, widget.expenseTransactions, _violet,  TransactionType.expense, _expenseScroll),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+            ]),
           ),
         ],
       ),
@@ -136,14 +140,23 @@ class _TransactionCardSheetsState extends State<TransactionCardSheets> with Sing
 
   Widget _tab(String title, IconData icon, int index) {
     final sel = _tabController.index == index;
-    return Tab(height: 40, child: Row(mainAxisSize: MainAxisSize.min, children: [Icon(icon, size: 16), const SizedBox(width: 6), Text(title, style: TextStyle(fontSize: 13, fontWeight: sel ? FontWeight.w700 : FontWeight.w500))]));
+    return Tab(
+      height: 40,
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 16),
+        const SizedBox(width: 6),
+        Text(title, style: TextStyle(fontSize: 13, fontWeight: sel ? FontWeight.w700 : FontWeight.w500)),
+      ]),
+    );
   }
 
-  Widget _buildList(BuildContext context, List<TransactionEntity> transactions, Color color, TransactionType type) {
+  Widget _buildList(BuildContext context, List<TransactionEntity> transactions, Color color, TransactionType type, ScrollController scrollController) {
     if (transactions.isEmpty) return _emptyState(context, color, type);
     return Scrollbar(
+      controller: scrollController,
       thumbVisibility: true,
       child: ListView.separated(
+        controller: scrollController,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         itemCount: transactions.length,
         separatorBuilder: (_, __) => const SizedBox(height: 6),
@@ -166,7 +179,7 @@ class _TransactionCardSheetsState extends State<TransactionCardSheets> with Sing
                     await widget.undoDelete.execute(undo);
                     final ok = widget.undoDelete.resultSignal.value?.isSuccess ?? false;
                     ScaffoldMessenger.of(widget.scaffoldContext).showSnackBar(SnackBar(
-                      content: Text(ok ? '${t.title} restaurada!' : widget.undoDelete.resultSignal.value?.failureValueOrNull.toString() ?? 'Erro'),
+                      content: Text(ok ? '${t.title} restaurada!' : 'Erro ao restaurar'),
                       backgroundColor: ok ? _success : _danger,
                     ));
                   },
@@ -201,11 +214,19 @@ class _TransactionTile extends StatelessWidget {
   final TransactionType type;
   final VoidCallback onDelete;
   final VoidCallback onEdit;
-  const _TransactionTile({required this.transaction, required this.color, required this.type, required this.onDelete, required this.onEdit});
+
+  const _TransactionTile({
+    required this.transaction,
+    required this.color,
+    required this.type,
+    required this.onDelete,
+    required this.onEdit,
+  });
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Dismissible(
       key: Key(transaction.id),
       direction: DismissDirection.endToStart,
@@ -229,42 +250,51 @@ class _TransactionTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: isDark ? _slate700.withValues(alpha: 0.4) : _slate100),
         ),
-        child: Row(
-          children: [
-            Container(
-              width: 4, height: 60,
-              decoration: BoxDecoration(
-                gradient: type == TransactionType.income ? _incomeGrad : _expenseGrad,
-                borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), bottomLeft: Radius.circular(16)),
-              ),
+        child: Row(children: [
+          // Barra lateral colorida
+          Container(
+            width: 4, height: 68,
+            decoration: BoxDecoration(
+              gradient: type == TransactionType.income ? _incomeGrad : _expenseGrad,
+              borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), bottomLeft: Radius.circular(16)),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: Container(
-                width: 40, height: 40,
-                decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                child: Icon(type == TransactionType.income ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, color: color, size: 20),
-              ),
+          ),
+
+          // Ícone
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Container(
+              width: 38, height: 38,
+              decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
+              child: Icon(type == TransactionType.income ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, color: color, size: 18),
             ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(transaction.title, style: Theme.of(context).textTheme.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  const SizedBox(height: 2),
-                  Text(Formatter.formatDate(transaction.date), style: Theme.of(context).textTheme.bodySmall),
-                ]),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
-                Text(Formatter.formatCurrency(transaction.amount), style: Theme.of(context).textTheme.titleSmall?.copyWith(color: color, fontWeight: FontWeight.w700)),
+          ),
+
+          // Título e data
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(transaction.title, style: Theme.of(context).textTheme.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
                 const SizedBox(height: 2),
+                Text(Formatter.formatDate(transaction.date), style: Theme.of(context).textTheme.bodySmall),
+              ]),
+            ),
+          ),
+
+          // Valor + botões Editar e Excluir
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Text(Formatter.formatCurrency(transaction.amount),
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(color: color, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 4),
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                // Editar
                 GestureDetector(
                   onTap: onEdit,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                     decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
                     child: Row(mainAxisSize: MainAxisSize.min, children: [
                       Icon(Icons.edit_rounded, size: 11, color: color.withValues(alpha: 0.8)),
@@ -273,10 +303,24 @@ class _TransactionTile extends StatelessWidget {
                     ]),
                   ),
                 ),
+                const SizedBox(width: 5),
+                // Excluir
+                GestureDetector(
+                  onTap: onDelete,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(color: _danger.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.delete_rounded, size: 11, color: _danger.withValues(alpha: 0.8)),
+                      const SizedBox(width: 3),
+                      Text('Excluir', style: TextStyle(fontSize: 10, color: _danger.withValues(alpha: 0.8), fontWeight: FontWeight.w600)),
+                    ]),
+                  ),
+                ),
               ]),
-            ),
-          ],
-        ),
+            ]),
+          ),
+        ]),
       ),
     );
   }
