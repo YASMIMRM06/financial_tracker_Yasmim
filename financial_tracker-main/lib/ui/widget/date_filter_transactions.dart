@@ -224,3 +224,5 @@ class _DateFilterWidgetState extends State<DateFilterTransactions> with SingleTi
     );
   }
 }
+
+//para funcionar o filtro de data personalizada, é necessário implementar a lógica de resolução do intervalo no DateFilterType e garantir que o repositório suporte a consulta por intervalo de datas. O widget é projetado para ser flexível e responsivo, com animações suaves e um design limpo que se encaixa bem tanto em temas claros quanto escuros.

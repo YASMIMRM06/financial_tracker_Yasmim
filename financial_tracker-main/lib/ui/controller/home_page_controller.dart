@@ -1,3 +1,6 @@
+// utilizo apenas o controller da home page, que é o mais complexo e tem a maioria das ações. 
+//Ele é responsável por gerenciar o estado da lista de transações, os filtros aplicados, e as ações de CRUD (criar, ler, atualizar, excluir) diretamente na tela. 
+//O controller se comunica com os use cases para realizar as operações necessárias e atualiza os sinais para refletir as mudanças na UI.
 import 'package:financial_tracker/common/types/date_filter_type.dart';
 import 'package:financial_tracker/domain/usecase/use_case_facade.dart';
 import 'package:signals_flutter/signals_flutter.dart';

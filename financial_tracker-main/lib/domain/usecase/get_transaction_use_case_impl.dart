@@ -21,3 +21,5 @@ class GetTransactionUseCaseImpl implements IUseCaseContract<
     return repo.getTransacion(params.id);
   }
 }
+
+//serve para pegar uma transação específica, mas não tem uso no app atualmente. Pode ser útil para detalhes ou edição futura.

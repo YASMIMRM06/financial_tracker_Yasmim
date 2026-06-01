@@ -1,12 +1,13 @@
+//a home screen mais complexa, com filtros por tipo e período, ações de editar/excluir diretamente na lista, e navegação para análise financeira. 
+//O código é um pouco mais verboso, mas mantém a UI responsiva e fácil de usar.
 import 'package:financial_tracker/common/config/dependencies.dart';
-import 'package:financial_tracker/common/types/date_filter_type.dart';
-import 'package:financial_tracker/domain/entity/transaction_entity.dart';
-import 'package:financial_tracker/ui/controller/home_page_controller.dart';
+import 'package:financial_tracker/common/types/date_filter_type.dart'; // filtro de data personalizada
+import 'package:financial_tracker/domain/entity/transaction_entity.dart'; // utilizada para tipar as transações e acessar propriedades como type, title, date, etc.
+import 'package:financial_tracker/ui/controller/home_page_controller.dart'; // aqui temos o controller específico da home page, que gerencia o estado e as ações
 import 'package:financial_tracker/ui/widget/date_filter_transactions.dart';
-import 'package:financial_tracker/ui/widget/summary_carousel.dart';
-import 'package:financial_tracker/ui/widget/transaction_sheet.dart';
-import 'package:financial_tracker/ui/widget/transaction_sheets_card.dart';
-import 'package:financial_tracker/ui/view/chart_screen.dart';
+import 'package:financial_tracker/ui/widget/summary_carousel.dart'; // e um carrossel horizontal para mostrar o resumo dos gastos e receitas, que é atualizado dinamicamente conforme as transações são carregadas ou filtradas.
+import 'package:financial_tracker/ui/widget/transaction_sheet.dart'; // utilizado para mostrar o bottom sheet de criação/edição de transações. O sheet é reutilizado para ambos os tipos (receita e despesa) e para edição, passando os parâmetros adequados.
+import 'package:financial_tracker/ui/widget/transaction_sheets_card.dart'; // aqui temos os botões de ação para nova receita e despesa, que abrem os respectivos bottom sheets. 
 import 'package:flutter/material.dart';
 import 'package:signals_flutter/signals_flutter.dart';
 
@@ -16,10 +17,10 @@ const _violet      = Color(0xFF7C4DFF);
 const _violetD     = Color(0xFF512DA8);
 const _slate400    = Color(0xFF94A3B8);
 const _slate700    = Color(0xFF334155);
-const _incomeGrad  = LinearGradient(colors: [_emerald, _emeraldL],  begin: Alignment.topLeft, end: Alignment.bottomRight);
+const _incomeGrad  = LinearGradient(colors: [Color.fromARGB(255, 15, 244, 221), _emeraldL],  begin: Alignment.topLeft, end: Alignment.bottomRight);
 const _expenseGrad = LinearGradient(colors: [_violetD, _violet],    begin: Alignment.topLeft, end: Alignment.bottomRight);
 const _heroGrad    = LinearGradient(colors: [Color(0xFF004D40), _emerald], begin: Alignment.topLeft, end: Alignment.bottomRight);
-const _heroGradDk  = LinearGradient(colors: [Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364)], begin: Alignment.topLeft, end: Alignment.bottomRight);
+const _heroGradDk  = LinearGradient(colors: [Color.fromARGB(255, 81, 126, 145), Color(0xFF203A43), Color(0xFF2C5364)], begin: Alignment.topLeft, end: Alignment.bottomRight);
 
 // Filtro de tipo de transação
 enum _TypeFilter { all, income, expense }
@@ -123,7 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   );
                 }),
 
-                // ── Filtro por tipo ──
+                // ── Filtro por tipo ── aqui é possível adicionar um filtro para mostrar apenas receitas ou despesas, além do modo "Todos". O filtro é aplicado diretamente na lista de transações, sem necessidade de recarregar os dados.
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                   child: Row(
@@ -141,7 +142,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
 
-                // ── Botões nova transação ──
+                // ── Botões nova transação ── utilizados para abrir os bottom sheets de nova receita ou despesa.
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
                   child: Row(
@@ -164,7 +165,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                 const SizedBox(height: 8),
 
-                // ── Lista filtrada ──
+                // ── Lista filtrada ── faz a filtração das transações por tipo (Receitas, Despesas ou Todos) e exibe a lista correspondente. A lista é atualizada dinamicamente conforme o filtro é alterado.
                 Watch((context) {
                   final incomes  = viewModelController.incomes.value;
                   final expenses = viewModelController.expenses.value;
@@ -214,7 +215,7 @@ class _HomeScreenState extends State<HomeScreen> {
       TransactionSheet.show(context: context, type: TransactionType.expense, submitCommand: viewModelController.saveTransaction);
 }
 
-// ── Chip de tipo ──
+// ── Chip de tipo ── feito para ser reutilizado tanto no filtro por tipo quanto na seleção de tipo dentro do formulário de transação. O chip tem um estado selecionado e um estilo visual que destaca o tipo ativo.
 class _TypeChip extends StatelessWidget {
   final String label;
   final bool selected;
@@ -238,7 +239,7 @@ class _TypeChip extends StatelessWidget {
   );
 }
 
-// ── Lista filtrada por tipo (ou mista quando type == null) ──
+// ── Lista filtrada por tipo (ou mista quando type == null) ── ela teve que ser feita como um widget separado para lidar com as ações de editar e excluir diretamente na lista, além de mostrar um layout diferente quando estiver no modo "Todos" (com indicador de tipo colorido e contagem total).
 class _FilteredList extends StatelessWidget {
   final List<TransactionEntity> transactions;
   final Color color;

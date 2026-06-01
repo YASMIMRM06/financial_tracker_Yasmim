@@ -1,7 +1,7 @@
 import 'package:financial_tracker/common/errors/errors_classes.dart';
-import 'package:financial_tracker/data/services/transaction_fake_service_impl.dart';
-import 'package:financial_tracker/domain/entity/transaction_entity.dart';
-import 'package:financial_tracker/helper/transaction_fake_repository.dart';
+import 'package:financial_tracker/data/services/transaction_fake_service_impl.dart'; //adicionada para testar a integraçao de service com o fake repo
+import 'package:financial_tracker/domain/entity/transaction_entity.dart'; // utilizada para criar transações de teste e verificar os resultados
+import 'package:financial_tracker/helper/transaction_fake_repository.dart'; // aqui possuimos o fake repository, que é a base para o fake service. Ele simula o comportamento do repositório real, mas com dados em memória e sem dependências externas.
 import 'package:flutter_test/flutter_test.dart';
 
 TransactionFakeServiceImpl _makeService({int numInstance = 3}) {

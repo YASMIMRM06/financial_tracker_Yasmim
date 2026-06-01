@@ -1,6 +1,8 @@
 import 'package:financial_tracker/domain/entity/transaction_entity.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+// ela foi feita para garantir que a entidade de transação funcione corretamente, especialmente os métodos de serialização (toMap, fromMap) 
+//e a função copyWith. Os testes cobrem casos comuns e verificam se a entidade se comporta como esperado, o que é crucial para a integridade dos dados em toda a aplicação.
 void main() {
   group('TransactionEntity', () {
     final date = DateTime(2024, 5, 20);
