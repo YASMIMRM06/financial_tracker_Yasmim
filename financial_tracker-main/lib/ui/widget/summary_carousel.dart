@@ -4,10 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class SummaryCarousel extends StatefulWidget {
-  /// Total income amount
   final double totalIncome;
-
-  /// Total expense amount
   final double totalExpense;
 
   const SummaryCarousel({
@@ -20,135 +17,137 @@ class SummaryCarousel extends StatefulWidget {
   State<SummaryCarousel> createState() => _SummaryCarouselState();
 }
 
-class _SummaryCarouselState extends State<SummaryCarousel>
-    with SingleTickerProviderStateMixin {
-  final PageController _pageController = PageController();
+class _SummaryCarouselState extends State<SummaryCarousel> {
   int _currentPage = 0;
-  late AnimationController _animationController;
-  late Animation<double> _scaleAnimation;
 
-  @override
-  void initState() {
-    super.initState();
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
-    _scaleAnimation = Tween<double>(begin: 0.9, end: 1.0).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-    _animationController.forward();
-  }
-
-  @override
-  void dispose() {
-    _pageController.dispose();
-    _animationController.dispose();
-    super.dispose();
+  void _goTo(int index) {
+    HapticFeedback.lightImpact();
+    setState(() => _currentPage = index);
   }
 
   @override
   Widget build(BuildContext context) {
+    final isFirst = _currentPage == 0;
+
     return Column(
-      children: <Widget>[
-        // Animated carousel of financial widgets
-        AnimatedBuilder(
-          animation: _scaleAnimation,
-          builder: (context, child) {
-            return Transform.scale(scale: _scaleAnimation.value, child: child);
-          },
-          child: SizedBox(
-            height: 240, // Fixed height for carousel
-            child: PageView.builder(
-              controller: _pageController,
-              physics:
-                  const BouncingScrollPhysics(), // Add bouncing effect for better feedback
-              itemCount: 2, // Summary card and chart
-              onPageChanged: (index) {
-                setState(() {
-                  _currentPage = index;
-                });
-                // Add haptic feedback when switching pages
-                HapticFeedback.lightImpact();
-              },
-              itemBuilder: (context, index) {
-                // Select which widget to show based on index
-                if (index == 0) {
-                  // Summary card page
-                  return Hero(
-                    tag: 'summary1-card',
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: SummaryCard(
-                        totalIncome: widget.totalIncome,
-                        totalExpense: widget.totalExpense,
-                        balance: widget.totalIncome - widget.totalExpense,
-                      ),
-                    ),
-                  );
-                } else {
-                  // Chart widget page
-                  return Hero(
-                    tag: 'chart-widget',
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: Card(
-                        elevation: 4,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: SummaryChart(
+      children: [
+        Stack(
+          children: [
+            // Conteúdo atual
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 350),
+              transitionBuilder: (child, anim) => FadeTransition(
+                opacity: anim,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: Offset(isFirst ? -0.08 : 0.08, 0),
+                    end: Offset.zero,
+                  ).animate(anim),
+                  child: child,
+                ),
+              ),
+              child: SizedBox(
+                key: ValueKey(_currentPage),
+                height: 240,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: _currentPage == 0
+                      ? SummaryCard(
                           totalIncome: widget.totalIncome,
                           totalExpense: widget.totalExpense,
+                          balance: widget.totalIncome - widget.totalExpense,
+                        )
+                      : Card(
+                          elevation: 4,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: SummaryChart(
+                            totalIncome: widget.totalIncome,
+                            totalExpense: widget.totalExpense,
+                          ),
                         ),
-                      ),
-                    ),
-                  );
-                }
-              },
+                ),
+              ),
             ),
-          ),
+
+            // Seta esquerda
+            if (_currentPage == 1)
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: GestureDetector(
+                    onTap: () => _goTo(0),
+                    child: Container(
+                      margin: const EdgeInsets.only(left: 12),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.chevron_left_rounded,
+                          color: Colors.white, size: 26),
+                    ),
+                  ),
+                ),
+              ),
+
+            // Seta direita
+            if (_currentPage == 0)
+              Positioned(
+                right: 0,
+                top: 0,
+                bottom: 0,
+                child: Center(
+                  child: GestureDetector(
+                    onTap: () => _goTo(1),
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 12),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.35),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.chevron_right_rounded,
+                          color: Colors.white, size: 26),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
+
         const SizedBox(height: 8),
-        // Animated page indicator dots
+
+        // Indicadores de página
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(
-            2,
-            (index) => TweenAnimationBuilder(
-              tween: Tween<double>(
-                begin: 0.0,
-                end: _currentPage == index ? 1.0 : 0.0,
-              ),
-              duration: const Duration(milliseconds: 300),
-              builder: (context, double value, _) {
-                return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  height: 8,
-                  width: value * 24 + 8, // Animated width
-                  decoration: BoxDecoration(
-                    color:
-                        _currentPage == index
-                            ? Theme.of(context).colorScheme.primary
-                            : Colors.grey.withValues(alpha: 0.4),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                );
-              },
+          children: List.generate(2, (index) => AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            height: 8,
+            width: _currentPage == index ? 32 : 8,
+            decoration: BoxDecoration(
+              color: _currentPage == index
+                  ? Theme.of(context).colorScheme.primary
+                  : Colors.grey.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(4),
             ),
-          ),
+          )),
         ),
+
         const SizedBox(height: 8),
-        // Swipe indicator text
-        Padding(
-          padding: const EdgeInsets.only(top: 4.0),
-          child: Text(
-            'Arraste para Visualizar o ${_currentPage == 0 ? "Gráfico" : "Resumo"}',
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.grey.shade600,
-              fontStyle: FontStyle.italic,
-            ),
+
+        Text(
+          _currentPage == 0
+              ? 'Toque em › para ver o Gráfico'
+              : 'Toque em ‹ para ver o Resumo',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.grey.shade600,
+            fontStyle: FontStyle.italic,
           ),
         ),
       ],

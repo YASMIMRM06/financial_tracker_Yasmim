@@ -55,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       body: CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
+        physics: const ClampingScrollPhysics(),
         slivers: [
           SliverAppBar(
             expandedHeight: 80,
@@ -170,19 +170,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   final expenses = viewModelController.expenses.value;
                   final filtered = _filterByType(incomes, expenses);
 
-                  // Quando há filtro de tipo, mostra lista simples
+                  // Filtro "Todos": lista combinada e ordenada por data
                   if (_typeFilter == _TypeFilter.all) {
-                    return TransactionCardSheets(
-                      incomeTransactions: incomes,
-                      expenseTransactions: expenses,
+                    return _FilteredList(
+                      transactions: filtered,
+                      color: _emerald,
+                      type: null, // null indica lista mista
                       onDelete: (id) => viewModelController.deleteTransaction.execute(id),
                       onEdit:   (t)  => _showEditSheet(context, t),
-                      undoDelete: viewModelController.undoDelectedTransaction,
+                      onUndo:   (t)  => viewModelController.undoDelectedTransaction.execute(t),
                       scaffoldContext: context,
                     );
                   }
 
-                  // Lista filtrada por tipo
+                  // Lista filtrada por tipo (Receitas ou Despesas)
                   return _FilteredList(
                     transactions: filtered,
                     color: _typeFilter == _TypeFilter.income ? _emerald : _violet,
@@ -237,94 +238,139 @@ class _TypeChip extends StatelessWidget {
   );
 }
 
-// ── Lista filtrada por tipo ──
+// ── Lista filtrada por tipo (ou mista quando type == null) ──
 class _FilteredList extends StatelessWidget {
   final List<TransactionEntity> transactions;
   final Color color;
-  final TransactionType type;
+  final TransactionType? type; // null = lista mista (Todos)
   final Function(String) onDelete;
   final Function(TransactionEntity) onEdit;
   final Function(TransactionEntity) onUndo;
   final BuildContext scaffoldContext;
   const _FilteredList({required this.transactions, required this.color, required this.type, required this.onDelete, required this.onEdit, required this.onUndo, required this.scaffoldContext});
 
+  Color _colorFor(TransactionType t) =>
+      t == TransactionType.income ? _emerald : _violet;
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    if (transactions.isEmpty) {
+    final isEmpty = transactions.isEmpty;
+    final emptyLabel = type == null ? 'transações' : type!.namePlural.toLowerCase();
+
+    if (isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(32),
-        child: Center(child: Text('Sem ${type.namePlural.toLowerCase()}', style: const TextStyle(color: _slate400))),
+        child: Center(child: Text('Sem $emptyLabel', style: const TextStyle(color: _slate400))),
       );
     }
+
+    // Cabeçalho "Todas as transações" só para o modo misto
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
-        children: transactions.map((t) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Dismissible(
-              key: Key('filtered_${t.id}'),
-              direction: DismissDirection.endToStart,
-              background: Container(
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.only(right: 20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: [Colors.transparent, const Color(0xFFEF4444).withValues(alpha: 0.9)], begin: Alignment.centerLeft, end: Alignment.centerRight),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Icon(Icons.delete_rounded, color: Colors.white, size: 22),
-              ),
-              onDismissed: (_) {
-                final undo = t.copyWith();
-                onDelete(t.id);
-                ScaffoldMessenger.of(scaffoldContext).clearSnackBars();
-                ScaffoldMessenger.of(scaffoldContext).showSnackBar(SnackBar(
-                  content: Text('${t.title} excluída'),
-                  action: SnackBarAction(label: 'DESFAZER', textColor: color, onPressed: () => onUndo(undo)),
-                ));
-              },
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isDark ? const Color(0xFF1E293B).withValues(alpha: 0.5) : Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: isDark ? const Color(0xFF334155).withValues(alpha: 0.4) : const Color(0xFFF1F5F9)),
-                ),
-                child: Row(children: [
-                  Container(width: 4, height: 60, decoration: BoxDecoration(color: color, borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), bottomLeft: Radius.circular(16)))),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Container(width: 38, height: 38, decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
-                      child: Icon(type == TransactionType.income ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, color: color, size: 18)),
-                  ),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(t.title, style: Theme.of(context).textTheme.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    Text('${t.date.day.toString().padLeft(2,'0')}/${t.date.month.toString().padLeft(2,'0')}/${t.date.year}', style: Theme.of(context).textTheme.bodySmall),
-                  ])),
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
-                      Text('R\$ ${t.amount.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 13)),
-                      const SizedBox(height: 2),
-                      GestureDetector(
-                        onTap: () => onEdit(t),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(color: color.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                          child: Row(mainAxisSize: MainAxisSize.min, children: [
-                            Icon(Icons.edit_rounded, size: 11, color: color.withValues(alpha: 0.8)),
-                            const SizedBox(width: 3),
-                            Text('Editar', style: TextStyle(fontSize: 10, color: color.withValues(alpha: 0.8), fontWeight: FontWeight.w600)),
-                          ]),
-                        ),
-                      ),
-                    ]),
-                  ),
-                ]),
-              ),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (type == null) ...[
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(children: [
+                Container(width: 3, height: 16, decoration: BoxDecoration(gradient: _incomeGrad, borderRadius: BorderRadius.circular(2))),
+                const SizedBox(width: 8),
+                Text('Todas as transações', style: TextStyle(color: isDark ? _slate400 : _slate700, fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.5)),
+                const Spacer(),
+                Text('${transactions.length} itens', style: const TextStyle(color: _slate400, fontSize: 11)),
+              ]),
             ),
-          );
-        }).toList(),
+          ],
+          ...transactions.map((t) {
+            final itemColor = type != null ? color : _colorFor(t.type);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Dismissible(
+                key: Key('filtered_${t.id}'),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(colors: [Colors.transparent, const Color(0xFFEF4444).withValues(alpha: 0.9)], begin: Alignment.centerLeft, end: Alignment.centerRight),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Icon(Icons.delete_rounded, color: Colors.white, size: 22),
+                ),
+                onDismissed: (_) {
+                  final undo = t.copyWith();
+                  onDelete(t.id);
+                  ScaffoldMessenger.of(scaffoldContext).clearSnackBars();
+                  ScaffoldMessenger.of(scaffoldContext).showSnackBar(SnackBar(
+                    content: Text('${t.title} excluída'),
+                    action: SnackBarAction(label: 'DESFAZER', textColor: itemColor, onPressed: () => onUndo(undo)),
+                  ));
+                },
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF1E293B).withValues(alpha: 0.5) : Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: isDark ? const Color(0xFF334155).withValues(alpha: 0.4) : const Color(0xFFF1F5F9)),
+                  ),
+                  child: Row(children: [
+                    Container(width: 4, height: 60, decoration: BoxDecoration(color: itemColor, borderRadius: const BorderRadius.only(topLeft: Radius.circular(16), bottomLeft: Radius.circular(16)))),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Container(width: 38, height: 38, decoration: BoxDecoration(color: itemColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+                        child: Icon(t.type == TransactionType.income ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded, color: itemColor, size: 18)),
+                    ),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(t.title, style: Theme.of(context).textTheme.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text('${t.date.day.toString().padLeft(2,'0')}/${t.date.month.toString().padLeft(2,'0')}/${t.date.year}', style: Theme.of(context).textTheme.bodySmall),
+                    ])),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.end, children: [
+                        Text('R\$ ${t.amount.toStringAsFixed(2).replaceAll('.', ',')}', style: TextStyle(color: itemColor, fontWeight: FontWeight.w700, fontSize: 13)),
+                        const SizedBox(height: 2),
+                        GestureDetector(
+                          onTap: () => onEdit(t),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(color: itemColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              Icon(Icons.edit_rounded, size: 11, color: itemColor.withValues(alpha: 0.8)),
+                              const SizedBox(width: 3),
+                              Text('Editar', style: TextStyle(fontSize: 10, color: itemColor.withValues(alpha: 0.8), fontWeight: FontWeight.w600)),
+                            ]),
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        GestureDetector(
+                          onTap: () {
+                            final undo = t.copyWith();
+                            onDelete(t.id);
+                            ScaffoldMessenger.of(scaffoldContext).clearSnackBars();
+                            ScaffoldMessenger.of(scaffoldContext).showSnackBar(SnackBar(
+                              content: Text('${t.title} excluída'),
+                              action: SnackBarAction(label: 'DESFAZER', textColor: itemColor, onPressed: () => onUndo(undo)),
+                            ));
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(color: const Color(0xFFEF4444).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              Icon(Icons.delete_rounded, size: 11, color: const Color(0xFFEF4444).withValues(alpha: 0.8)),
+                              const SizedBox(width: 3),
+                              Text('Excluir', style: TextStyle(fontSize: 10, color: const Color(0xFFEF4444).withValues(alpha: 0.8), fontWeight: FontWeight.w600)),
+                            ]),
+                          ),
+                        ),
+                      ]),
+                    ),
+                  ]),
+                ),
+              ),
+            );
+          }),
+        ],
       ),
     );
   }
